@@ -1,0 +1,17 @@
+#!/usr/bin/env python3
+"""Convert all .dta files in a directory to .csv using pandas.
+
+Usage:
+    python make_csv.py --dir C:\path\to\dir [--overwrite]
+
+This script reads every .dta file in the given directory and writes a
+corresponding .csv file next to it.
+"""
+
+import argparse
+import sys
+from pathlib import Path
+
+import pandas as pd
+
+
