@@ -83,3 +83,30 @@ v
 |
 v
 [ FINAL UNIFIED DATASET ]
+
+
+### 1. Sub-set Table Elimination & Flagging
+- `childrens_recode` (`KR`) is a row-filtered subset of `births_recode` (`BR`) restricted to children under 5 years old.
+- `pregnancy_postnatal` (`NR`) is a row-filtered subset of `pregnancy_questionnaire` (`GR`).
+- **Optimization**: Joining `KR` and `NR` as standalone tables creates over 2,100 duplicate columns. Instead, they are evaluated at runtime to construct two high-value binary indicators: `is_in_children_recode` and `is_in_postnatal`.
+
+### 2. Wide-Array Column Stripping
+- `individual_recode` (`IR`) and `household_recode` (`HR`) flatten individual histories into wide arrays (e.g., `bidx_01...bidx_20`, `hv101_01...hv101_25`).
+- **Optimization**: All array-suffixed columns matching regex pattern `^.*_\d+$` are dropped prior to merging. Only baseline maternal (education, age, parity) and household (wealth quintile, water source, sanitation) attributes are retained.
+
+### 3. Incremental Feature Ingestion
+- `births_recode` shares ~886 columns with `pregnancy_questionnaire`.
+- **Optimization**: The ingestion script extracts *only* the ~352 unique, live-birth-specific columns present in `BR` (such as detailed delivery care, birth weight, and neonate health) and appends them to the base table using key alignment (`bidx` $\rightarrow$ `pidx`).
+
+---
+
+## Entity Relationship Architecture
++---------------------------------------+
+                   |   pregnancy_questionnaire (GR Base)   |
+                   |       Rows: 73,239 | Cols: 886        |
+                   +-------------------+-------------------+
+                                       |
+       +-------------------------------+-------------------------------+
+       | (1:1 on caseid + pidx)        | (N:1 on caseid)               | (N:1 on hhid)
+       v                               v                               v
++-----------------------+     +-----------------------+     +-----------------------+
