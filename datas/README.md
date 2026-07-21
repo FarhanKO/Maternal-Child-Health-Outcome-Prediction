@@ -1,193 +1,107 @@
-# DHS Maternal & Child Health Data Engineering Pipeline
+# DHS Maternal & Child Health Dataset
 
-*A Lean Integration Framework for Demographic and Health Survey (DHS) Recode Files*
+This directory contains the **data processing pipeline** used to prepare Demographic and Health Surveys (DHS) microdata for downstream statistical analysis, epidemiological research, and machine learning.
 
-An optimized, non-redundant data engineering pipeline for transforming standard DHS recode files into a unified pregnancy-level analytical dataset suitable for statistical analysis, machine learning, epidemiological research, and public health reporting.
-
----
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Dataset Output](#dataset-output)
-- [DHS Data Compliance, Ethics & Citation](#dhs-data-compliance-ethics--citation)
-- [DHS Survey Architecture](#dhs-survey-architecture)
-- [Entity & Primary Keys](#entity--primary-keys)
-- [Data Engineering Strategy](#data-engineering-strategy)
-  - [1. Subset Table Elimination](#1-subset-table-elimination)
-  - [2. Wide-Array Column Removal](#2-wide-array-column-removal)
-  - [3. Incremental Feature Ingestion](#3-incremental-feature-ingestion)
-- [Pipeline Architecture](#pipeline-architecture)
-- [Entity Relationship Diagram](#entity-relationship-diagram)
-- [Applications](#applications)
-- [Reproducibility](#reproducibility)
-- [Directory Structure](#directory-structure)
-- [Getting Started](#getting-started)
-- [References](#references)
+> **Important:** This repository **does not contain any DHS microdata**. Only the code required to process authorized DHS datasets is included.
 
 ---
 
-# Overview
+# Dataset Source
 
-The Demographic and Health Surveys (DHS) Program distributes survey data as multiple flattened recode files (IR, BR, KR, GR, HR, etc.), each representing different analytical units. Since these files share hundreds of duplicated variables, naïvely merging them often produces thousands of redundant columns, repeated information, and unnecessarily large datasets.
+The datasets used in this project are obtained from **The DHS Program** under an approved research request.
 
-This repository implements a lean data engineering pipeline that constructs a normalized pregnancy-level analytical dataset by:
+Official website:
 
-- Selecting the Pregnancy Recode (GR) as the primary analytical table
-- Removing redundant subset recodes
-- Eliminating wide repeated-member array variables
-- Incrementally ingesting only unique variables from related recodes
-- Preserving important maternal, pregnancy, household, and birth information while minimizing schema duplication
+https://dhsprogram.com
 
-The resulting dataset is designed for:
-
-- Machine Learning
-- Statistical Modeling
-- Epidemiological Research
-- Maternal & Child Health Studies
-- Public Health Reporting
+Because DHS data are protected by a data-use agreement, they **cannot be redistributed** through this repository. Every user must request and download the datasets using their own approved DHS account.
 
 ---
 
-# Dataset Output
+# Required DHS Recode Files
 
-Output format:
+Place the following DHS recode files inside the `raw/` directory before running the preprocessing pipeline.
 
-```
-unified_dataset.parquet
-```
+| File                              | DHS Recode | Description                        |
+| --------------------------------- | ---------- | ---------------------------------- |
+| `pregnancy_questionnaire.csv`     | GR         | Pregnancy Recode (Primary Dataset) |
+| `births_recode.csv`               | BR         | Birth History Recode               |
+| `childrens_recode.csv`            | KR         | Children Under Five Recode         |
+| `pregnancy_postnatal.csv`         | NR         | Pregnancy Postnatal Recode         |
+| `individual_recode.csv`           | IR         | Women's Individual Recode          |
+| `household_recode.csv`            | HR         | Household Recode                   |
+| `verbal_autopsy.csv` *(optional)* | VA         | Verbal Autopsy Recode              |
 
-or
-
-```
-unified_dataset.csv
-```
-
-## Unit of Analysis
-
-Each row represents **one pregnancy event**.
-
-Typical output characteristics (survey dependent):
-
-- One pregnancy per row
-- Pregnancy-level features
-- Maternal demographic variables
-- Household socioeconomic variables
-- Birth-specific variables
-- Optional mortality indicators
-
-Because DHS surveys differ slightly across countries and survey phases, the exact number of variables depends on the source datasets being processed.
+The pipeline has been designed using the standard DHS recode structure and may require minor adjustments for surveys with country-specific variables.
 
 ---
 
-# DHS Data Compliance, Ethics & Citation
+# Dataset Structure
 
-> **IMPORTANT:** This repository contains **data engineering code only**.
+Each DHS recode represents a different analytical unit.
 
-No DHS microdata (raw or processed) is stored, redistributed, or hosted in this repository.
+| Recode | Unit of Analysis        |
+| ------ | ----------------------- |
+| GR     | Pregnancy               |
+| BR     | Live Birth              |
+| KR     | Living Child (<5 years) |
+| NR     | Recent Pregnancy        |
+| IR     | Woman                   |
+| HR     | Household               |
+| VA     | Mortality Event         |
 
-## Terms of Use
-
-1. DHS datasets must be obtained directly from The DHS Program under an approved research request.
-
-2. Only registered collaborators approved under the DHS project should access the downloaded datasets.
-
-3. Redistribution of DHS microdata, whether raw, modified, or embedded in another dataset, is prohibited under DHS Terms of Use.
-
-4. Survey respondents are fully anonymized. No attempt should be made to identify any individual, household, or community.
-
-5. Publications using DHS data should follow the official DHS citation guidelines and submit resulting reports to:
-
-```
-references@dhsprogram.com
-```
+Since these recodes overlap extensively, directly merging them produces hundreds of duplicated variables and many unnecessary columns. The preprocessing pipeline removes this redundancy while preserving the information required for analysis.
 
 ---
 
-# DHS Survey Architecture
+# Data Processing Strategy
 
-| Dataset | DHS Recode | Entity | Primary Keys | Pipeline Treatment |
-|----------|------------|------------|----------------|-------------------|
-| pregnancy_questionnaire.csv | GR | Pregnancy | caseid + pidx | Primary Base Dataset |
-| births_recode.csv | BR | Live Birth | caseid + bidx → pidx | Incremental Feature Ingestion |
-| childrens_recode.csv | KR | Living Child (<5) | caseid + bidx | Converted into Binary Flag |
-| pregnancy_postnatal.csv | NR | Recent Pregnancy | caseid + pidx | Converted into Binary Flag |
-| individual_recode.csv | IR | Woman | caseid | Covariate Join |
-| household_recode.csv | HR | Household | hhid / v001 + v002 | Covariate Join |
-| verbal_autopsy.csv | VA | Mortality Event | caseid (or survey-specific identifiers) | Optional Left Join |
+The preprocessing pipeline follows a lean integration strategy to create a single pregnancy-level analytical dataset.
+
+## 1. Primary Base Dataset
+
+The **Pregnancy Recode (GR)** is used as the primary dataset because it provides the broadest pregnancy-level coverage and serves as the foundation for all subsequent feature integration.
+
+Each row in the final dataset represents **one pregnancy event**.
 
 ---
 
-# Entity & Primary Keys
+## 2. Subset Recode Optimization
 
-| Variable | Description |
-|------------|----------------------------|
-| caseid | Unique woman identifier |
-| pidx | Pregnancy index |
-| bidx | Birth index |
-| hhid | Household identifier |
-| v001 | Cluster number |
-| v002 | Household number |
+Two DHS recodes are subsets of larger datasets:
 
-The pipeline aligns pregnancy and birth records using the appropriate DHS relationship between `bidx` and `pidx`, depending on the survey design.
+* **KR (Children's Recode)** is a subset of BR containing only living children younger than five years.
+* **NR (Pregnancy Postnatal Recode)** is a subset of GR.
 
----
+Instead of merging these highly redundant tables, the pipeline generates two binary indicators:
 
-# Data Engineering Strategy
+* `is_in_children_recode`
+* `is_in_postnatal`
 
-```
-RAW DHS RECODES
-
-children_recode ──────────────┐
-                              │
-pregnancy_postnatal ──────────┤
-                              ▼
-                     Binary Flag Generator
-                              │
-                              ▼
-                  is_in_children_recode
-                  is_in_postnatal
-                              │
-                              ▼
-               pregnancy_questionnaire (GR)
-                    Primary Base Dataset
-                              │
-                              ▼
-             + Birth-specific Unique Variables
-                              │
-                              ▼
-          + Maternal Demographic Variables (IR)
-                              │
-                              ▼
-        + Household Socioeconomic Variables (HR)
-                              │
-                              ▼
-      + Optional Mortality Information (VA)
-                              │
-                              ▼
-               Unified Analytical Dataset
-```
+This preserves their analytical value without introducing duplicate variables.
 
 ---
 
-## 1. Subset Table Elimination
+## 3. Birth Feature Integration
 
-The Children's Recode (KR) is a filtered subset of the Birth Recode (BR), containing only surviving children younger than five years.
+The Birth Recode (BR) shares many variables with the Pregnancy Recode (GR).
 
-Similarly, the Pregnancy Postnatal Recode (NR) is a filtered subset of the Pregnancy Recode (GR).
+Rather than importing every BR column, the pipeline automatically identifies variables that are unique to BR and appends only those variables to the base dataset.
 
-Rather than merging these highly redundant tables, the pipeline evaluates record membership and creates two informative indicators:
+Typical examples include:
 
-- `is_in_children_recode`
-- `is_in_postnatal`
+* Birth weight
+* Delivery information
+* Neonatal care
+* Newborn health indicators
 
-This approach substantially reduces duplicate variables while preserving the analytical information contained in these subsets.
+The exact number of integrated variables depends on the DHS survey version.
 
 ---
 
-## 2. Wide-Array Column Removal
+## 4. Household and Maternal Covariates
 
-The Individual Recode (IR) and Household Recode (HR) contain numerous repeated-member variables represented as wide arrays, for example:
+The Individual Recode (IR) and Household Recode (HR) contain numerous repeated-member array variables such as:
 
 ```
 hv101_01
@@ -201,9 +115,9 @@ bidx_02
 bidx_20
 ```
 
-These variables describe repeated household members or historical events and generate hundreds of sparse columns when merged.
+These wide-array variables describe repeated household members or historical events and substantially increase dataset dimensionality.
 
-Prior to joining, all array-style variables matching
+Before merging, all columns matching the pattern
 
 ```
 ^.*_\d+$
@@ -211,157 +125,82 @@ Prior to joining, all array-style variables matching
 
 are removed.
 
-Only core covariates such as:
+The pipeline retains only core covariates such as:
 
-- maternal age
-- education
-- marital status
-- parity
-- household wealth
-- sanitation
-- drinking water
-- residence
+* Maternal age
+* Education
+* Marital status
+* Household wealth
+* Water source
+* Sanitation
+* Residence
 
-are retained.
-
----
-
-## 3. Incremental Feature Ingestion
-
-The Birth Recode (BR) shares a large proportion of variables with the Pregnancy Recode (GR).
-
-Instead of importing the entire BR dataset, the pipeline automatically identifies variables that are unique to BR and appends only those variables to the base dataset.
-
-Examples include:
-
-- birth weight
-- neonatal care
-- delivery complications
-- place of delivery
-- newborn health indicators
-
-The exact number of appended variables depends on the DHS survey version and country.
+These variables are then joined to the pregnancy-level dataset.
 
 ---
 
-# Pipeline Architecture
+## 5. Optional Mortality Information
+
+If available, the Verbal Autopsy (VA) dataset can be joined to provide additional mortality-related variables and cause-of-death information.
+
+Because this dataset is considerably smaller than the other recodes, it is treated as an optional enrichment step rather than a required input.
+
+---
+
+# Processing Workflow
 
 ```
-                    GR (Primary Dataset)
-                           │
-         ┌─────────────────┼─────────────────┐
-         │                 │                 │
-         ▼                 ▼                 ▼
-      BR Features      IR Covariates     HR Covariates
-         │                 │                 │
-         └─────────────────┼─────────────────┘
-                           ▼
-                  Unified Pregnancy Dataset
-                           │
-                           ▼
-               Optional Verbal Autopsy Join
+Raw DHS Recode Files
+        │
+        ▼
+Pregnancy Recode (GR)
+        │
+        ├── Generate subset flags (KR, NR)
+        │
+        ├── Add unique birth features (BR)
+        │
+        ├── Join maternal variables (IR)
+        │
+        ├── Join household variables (HR)
+        │
+        └── Optional mortality enrichment (VA)
+        │
+        ▼
+Unified Pregnancy-Level Dataset
 ```
 
 ---
 
-# Entity Relationship Diagram
+# Output
+
+The preprocessing pipeline produces a cleaned, integrated dataset ready for downstream analysis.
+
+Typical output formats include:
 
 ```
-                    pregnancy_questionnaire (GR)
-                           │
-          (1:1 on caseid + pidx)
-                           │
-          ┌────────────────┼────────────────┐
-          ▼                ▼                ▼
-    births_recode     individual_recode   household_recode
-        (BR)                (IR)               (HR)
-          │
-          ▼
-   verbal_autopsy (Optional)
+processed/unified_dataset.parquet
 ```
+
+or
+
+```
+processed/unified_dataset.csv
+```
+
+The final dataset is suitable for:
+
+* Machine learning
+* Statistical modeling
+* Epidemiological research
+* Maternal and child health studies
+* Public health reporting
 
 ---
 
-# Applications
+# Data Privacy & Licensing
 
-The integrated dataset is suitable for:
+This repository contains **processing code only**.
 
-- Maternal mortality prediction
-- Neonatal outcome prediction
-- Child health prediction
-- Pregnancy risk assessment
-- Feature engineering
-- Public health reporting
-- Epidemiological studies
-- Machine learning research
-- Statistical analysis
+No raw or processed DHS microdata are distributed with this project for strict dhs policy.
 
----
-
-# Reproducibility
-
-The pipeline is deterministic.
-
-Given identical DHS recode files and configuration, repeated executions produce identical integrated datasets.
-
-All processing steps are modular, documented, and reproducible.
-
----
-
-# Directory Structure
-
-```
-project/
-│
-├── data/
-│   ├── raw/
-│   ├── processed/
-│   └── interim/
-│
-├── notebooks/
-│
-├── src/
-│   ├── preprocessing/
-│   ├── feature_engineering/
-│   ├── integration/
-│   ├── validation/
-│   └── utils/
-│
-├── configs/
-│
-├── outputs/
-│
-├── README.md
-├── requirements.txt
-└── .gitignore
-```
-
----
-
-# Getting Started
-
-1. Request access to the required DHS datasets from The DHS Program.
-
-2. Download the approved recode files.
-
-3. Place the datasets into:
-
-```
-data/raw/
-```
-
-4. Run the preprocessing pipeline.
-
-5. Generate the unified analytical dataset.
-
----
-
-# References
-
-- The DHS Program. *Demographic and Health Surveys (DHS).* https://dhsprogram.com
-
-- DHS Recode Manual
-
-- DHS Guide to Statistics
-
-- DHS Methodology Reports
+Users are responsible for obtaining the required datasets directly from **The DHS Program** and must comply with all DHS Terms of Use, licensing requirements, and data confidentiality policies.
