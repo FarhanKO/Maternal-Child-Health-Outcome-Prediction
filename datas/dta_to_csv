@@ -15,3 +15,25 @@ from pathlib import Path
 import pandas as pd
 
 
+def convert_dta_to_csv(dta_path: Path, overwrite: bool = False) -> bool:
+    csv_path = dta_path.with_suffix('.csv')
+    if csv_path.exists() and not overwrite:
+        print(f"Skipping {dta_path.name} because {csv_path.name} already exists.")
+        return True
+
+    try:
+        df = pd.read_stata(dta_path)
+    except Exception as exc:
+        print(f"ERROR: failed to read {dta_path.name}: {exc}")
+        return False
+
+    try:
+        df.to_csv(csv_path, index=False, encoding='utf-8-sig')
+    except Exception as exc:
+        print(f"ERROR: failed to write {csv_path.name}: {exc}")
+        return False
+
+    print(f"Converted {dta_path.name} -> {csv_path.name} (rows={len(df):,}, cols={len(df.columns):,})")
+    return True
+
+
