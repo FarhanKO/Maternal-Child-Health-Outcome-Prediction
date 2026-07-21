@@ -56,3 +56,30 @@ The pipeline processes seven microdata sources corresponding to standard DHS Rec
 ---
 
 ## Data Deduplication & Engineering Strategy
+RAW DHS RECODES                          LEAN ARCHITECTURE PIPELINE
++------------------+
+| childrens_recode | ----------+
++------------------+           |
+v
++------------------+     [Coverage Flags] ------> [ is_in_children_recode ]
+| pregnancy_postnatal| ----> [Only (1/0)] -------> [ is_in_postnatal        ]
++------------------+
+|
++--------------------------+                            |
+| pregnancy_questionnaire  | === Primary Base Key ===> (73,239 Base Rows)
++--------------------------+                            |
+|
++--------------------------+                            v
+| births_recode            | ---> [Filter New Cols] --> Left Join on (caseid, pidx)
++--------------------------+
+|
++--------------------------+                            v
+| individual_recode (IR)   | ---> [Strip Arrays _*] -> Left Join on (caseid)
++--------------------------+
+|
++--------------------------+                            v
+| household_recode (HR)    | ---> [Strip Arrays _*] -> Left Join on (hhid)
++--------------------------+
+|
+v
+[ FINAL UNIFIED DATASET ]
