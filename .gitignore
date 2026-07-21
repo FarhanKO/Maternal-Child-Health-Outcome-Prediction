@@ -1,0 +1,10 @@
+# Ignore all CSV files
+*.csv
+
+# Ignore entire data directory contents
+data/raw/*
+data/processed/*
+
+# Keep folder structure intact using .gitkeep if needed
+!data/raw/.gitkeep
+!data/processed/.gitkeep
