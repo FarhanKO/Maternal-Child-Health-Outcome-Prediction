@@ -1,3 +1,11 @@
+"""
+The cleaning script first resolves duplicate merge artifacts by consolidating non-null values from _y columns into their _x counterparts before dropping the redundant _y features. It then removes all unique row identifiers and index flags (such as caseid, pidx, bidx, hidx, and idx92–idx96) along with recode existence flags (is_in_children_recode, is_in_postnatal) to eliminate arbitrary key numbers and prevent target leakage.
+
+Next, the pipeline strips out administrative metadata and survey logistics that offer zero predictive value for health outcomes. This includes cluster and sample area codes (v000–v004), interviewer and fieldwork management fields (v015–v019, v030–v032, v045–v046), unengineered Century Month/Day date codes (v006–v008a, s228bd–s228by), and all sampling design weights or strata (v005, v021–v028, awfact*).
+
+Finally, the script addresses data sparsity by filtering out incomplete variables. It automatically detects and removes zero-sample features (columns with 100% missing values) as well as any sparse variables containing 70% or more missing values (NaN), ensuring the final master dataset is compact and ready for pipeline split.
+"""
+
 import pandas as pd
 
 df = pd.read_csv('final_maternal_child_dataset.csv')
