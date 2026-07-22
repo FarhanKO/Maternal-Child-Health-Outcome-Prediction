@@ -32,3 +32,16 @@ explicit_drop = {
     'awfactt', 'awfactu', 'awfactr', 'awfacte', 'awfactw', 's228bd', 's228bm', 's228by'
 }
 
+# Convert plain names to actual present names in the dataframe
+cols_to_drop = []
+for col in df_cleaning.columns:
+    col_base = col.replace('_x', '').replace('_y', '')
+    if col in explicit_drop or col_base in explicit_drop:
+        cols_to_drop.append(col)
+
+# 3) Features with 0 sample (all values missing)
+zero_sample = df_cleaning.columns[df_cleaning.isna().all()].tolist()
+
+# 4) Missing percentage summary
+missing_pct = df_cleaning.isna().mean().sort_values(ascending=False)
+
