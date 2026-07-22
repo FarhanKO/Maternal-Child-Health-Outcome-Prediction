@@ -12,7 +12,7 @@ It automatically detects and removes zero-sample features as well as any sparse 
 
 import pandas as pd
 
-df = pd.read_csv('final_maternal_child_dataset.csv')
+df = pd.read_csv('final_maternal_child_dataset.csv', low_memory = False)
 
 # Read the CSV and prepare a cleaned output file
 input_csv = 'final_maternal_child_dataset.csv'
