@@ -18,3 +18,9 @@ def extract_features(csv_path: Path = DATASET_PATH) -> list[str]:
     return header
 
 
+def save_features(features: list[str], output_path: Path = OUTPUT_PATH) -> Path:
+    """Save the extracted feature names to a text file."""
+    output_path.write_text("\n".join(features), encoding="utf-8")
+    return output_path
+
+
