@@ -24,3 +24,10 @@ def save_features(features: list[str], output_path: Path = OUTPUT_PATH) -> Path:
     return output_path
 
 
+if __name__ == "__main__":
+    features = extract_features()
+    print(f"Found {len(features)} features")
+    print("\n".join(features))
+
+    output_file = save_features(features)
+    print(f"\nSaved features to: {output_file}")
