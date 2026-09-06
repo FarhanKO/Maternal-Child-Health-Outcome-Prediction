@@ -139,9 +139,3 @@ those who died, so its mere presence is the label. Including it lifted
 - **Not deployable in one case.** `severe_stunting` has *negative* net benefit
   at its operating point under decision curve analysis. It is reported for
   completeness and should not be used as a standalone screen.
-
-## Data
-
-BDHS microdata is licensed by The DHS Program and cannot be redistributed. See
-[`data/README.md`](data/README.md) for how to request it and rebuild the
-cohorts.
