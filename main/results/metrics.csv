@@ -1,0 +1,6 @@
+target,model,test_roc_auc,test_pr_auc,test_recall_at_0.5,threshold,prevalence,lift_pr_auc_over_prevalence
+facility_delivery,Ensemble,0.8447,0.878,0.8315,0.794,0.5724496426250812,1.53
+neonatal_death,Ensemble,0.7727,0.2083,0.1873,0.4195,0.04029463508254403,5.17
+stunted,CatBoost,0.7063,0.5231,0.2597,0.357,0.2866822820813117,1.82
+severe_stunting,Ensemble,0.7005,0.1846,0.1229,0.3258,0.07930399866153588,2.33
+underweight_child,TabM,0.687,0.4119,0.1667,0.2759,0.22443514644351464,1.84

@@ -1,0 +1,6 @@
+target,phase,kind,model,threshold,n_features,test_roc_auc,test_pr_auc,test_recall_at_0.5,conformal_alpha,conformal_quantile
+facility_delivery,delivery,pathway,Ensemble,0.794,116,0.8447,0.878,0.8315,0.1,0.6791
+neonatal_death,newborn,adverse,Ensemble,0.4195,96,0.7727,0.2083,0.1873,0.1,0.4177
+stunted,child,adverse,CatBoost,0.357,104,0.7063,0.5231,0.2597,0.1,0.7492
+severe_stunting,child,adverse,Ensemble,0.3258,104,0.7005,0.1846,0.1229,0.1,0.4957
+underweight_child,child,adverse,TabM,0.2759,104,0.687,0.4119,0.1667,0.1,0.7424
