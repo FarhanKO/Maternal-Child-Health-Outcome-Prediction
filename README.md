@@ -42,9 +42,8 @@ Neonatal death, same model, same split, three feature sets:
 | Fertility identity retained | 0.967 | children ever born − living children **is** the death count |
 | Survivor-only age retained | 0.987 | `b8` exists for 96.7% of survivors and 0% of deaths, so its presence is the label |
 
-A published BDHS study reports 99.79% AUROC for under-five mortality. A
-meta-analysis of eleven DHS studies puts realistic pooled accuracy for stunting
-near 69%. The gap between those two facts is what this project is about, and
+[Naznin et al. (2025)](https://doi.org/10.1371/journal.pone.0324825) reports 99.79% AUROC for under-five mortality. A meta-analysis of eleven DHS studies puts realistic, pooled accuracy for stunting
+near 69% ([Rao et al., 2025](https://doi.org/10.3390/ijerph22030449)). The gap between those two facts is what this project is about, and
 the table above is the most likely explanation for it.
 
 ---
@@ -139,11 +138,9 @@ and the assertions in [`test.py`](Maternity%20Health/test.py).
   ranges. Severe stunting has *negative* net benefit at its operating point and
   should not be used as a standalone screen.
 
-### A pretrained transformer changes nothing
+### A pretrained transformer was used
 
-TabPFN-3 was benchmarked separately under the identical split, preprocessing
-and 10,000-row context cap: PR-AUC 0.872 / 0.166 / 0.516 / 0.185 / 0.417.
-Behind the incumbent on three targets, ahead on two by 0.0005 and 0.0046 —
+[TabPFN-3](https://doi.org/10.1038/s41586-024-08328-6) was benchmarked separately under the identical split, preprocessing and 10,000-row context cap: PR-AUC 0.872 / 0.166 / 0.516 / 0.185 / 0.417. Behind the incumbent on three targets, ahead on two by 0.0005 and 0.0046 —
 0.5% and 5.6% of the corresponding bootstrap interval widths, so both are ties.
 A model family with an entirely different inductive bias reproducing the same
 envelope is the clearest evidence that the ceiling is informational.
@@ -221,6 +218,22 @@ operational and equity analyses at explicit screening thresholds.
 
 **MD Farhan**
 Department of Computer Science and Engineering, BRAC University, Dhaka
+
+## References
+
+1. Naznin, S., Uddin, M. J., & Kabir, A. (2025). Identifying determinants
+   of under-5 mortality in Bangladesh: A machine learning approach with BDHS
+   2022 data. *PLOS ONE, 20*(6), e0324825.
+   https://doi.org/10.1371/journal.pone.0324825
+
+2. Rao, B. et al. (2025). Machine learning in predicting child malnutrition:
+   A meta-analysis of Demographic and Health Surveys data.
+   *International Journal of Environmental Research and Public Health, 22*(3), 449.
+   https://doi.org/10.3390/ijerph22030449
+
+3. Hollmann, N. et al. (2025). Accurate predictions on small data with a
+   tabular foundation model. *Nature, 637*, 319–326.
+   https://doi.org/10.1038/s41586-024-08328-6
 
 Data courtesy of The DHS Program and the National Institute of Population
 Research and Training, Bangladesh.
