@@ -153,8 +153,8 @@ envelope is the clearest evidence that the ceiling is informational.
 ## Reproducing
 
 ```bash
-git clone <this-repo>
-cd "Maternity Health"
+git clone https://github.com/FarhanKO/Maternal-Child-Health-Outcome-Prediction.git
+cd Maternal-Child-Health-Outcome-Prediction/Maternity_Health
 pip install -r requirements.txt
 python test.py                # 49 tests, no data needed, ~2 seconds
 ```
@@ -171,7 +171,7 @@ streamlit run app/app.py                           # score a subject
 To rebuild the cohorts from scratch, run `build_clean_dataset.py` and
 `build_raw_merge_2017.py`, then `01_data_preparation.ipynb`.
 
-Full package documentation: [`Maternity Health/README.md`](Maternity%20Health/README.md).
+Full package documentation: [Maternity_Health/README.md](Maternity_Health/README.md).
 
 ---
 
@@ -211,7 +211,7 @@ from the variables used here.
 
 ## Paper
 
-[`paper/Conference_paper.pdf`](paper/Conference_paper.pdf) — IEEE conference
+[Papers/Conference_paper.pdf](Papers/Conference_paper.pdf) — IEEE conference
 format, 7 pages, 19 references. Covers the pooled corpus and per-round
 indicator checks, the five-class leakage taxonomy with before-and-after
 measurements, the seven-learner benchmark and post-hoc ensemble, and the
