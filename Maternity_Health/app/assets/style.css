@@ -1,0 +1,81 @@
+/* Maternity Health dashboard — a calm clinical palette.
+   Deliberately low-contrast and unalarming: this screen reports population
+   risk to a health worker, and a red-alert aesthetic would overstate what a
+   socio-demographic model can actually say about one person. */
+
+:root {
+  --mh-ink: #1d2b32;
+  --mh-muted: #5b6b74;
+  --mh-line: #dfe6e9;
+  --mh-routine: #2a9d8f;
+  --mh-monitor: #e9a03b;
+  --mh-priority: #d64545;
+  --mh-surface: #f7f9fa;
+}
+
+.main .block-container {
+  padding-top: 2.2rem;
+  max-width: 1200px;
+}
+
+h1 {
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: var(--mh-ink);
+}
+
+h2, h3 {
+  font-weight: 600;
+  color: var(--mh-ink);
+}
+
+/* Metric tiles: quieter than the Streamlit default, which shouts. */
+[data-testid="stMetricValue"] {
+  font-size: 1.45rem;
+  font-weight: 600;
+}
+
+[data-testid="stMetricLabel"] {
+  color: var(--mh-muted);
+  font-size: 0.82rem;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+
+[data-testid="stMetricDelta"] {
+  font-size: 0.78rem;
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"] {
+  background: var(--mh-surface);
+  border-right: 1px solid var(--mh-line);
+}
+
+section[data-testid="stSidebar"] .stRadio label {
+  padding: 0.18rem 0;
+  font-size: 0.94rem;
+}
+
+/* Tables read as data, not as decoration. */
+[data-testid="stDataFrame"] {
+  border: 1px solid var(--mh-line);
+  border-radius: 8px;
+}
+
+/* Inline code — feature and target names appear constantly. */
+code {
+  background: #eef2f4;
+  color: #24424e;
+  padding: 0.08em 0.36em;
+  border-radius: 4px;
+  font-size: 0.88em;
+}
+
+.stCaption, [data-testid="stCaptionContainer"] {
+  color: var(--mh-muted);
+}
+
+hr {
+  border-color: var(--mh-line);
+}
