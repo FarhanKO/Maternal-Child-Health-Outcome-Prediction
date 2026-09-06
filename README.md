@@ -217,9 +217,10 @@ indicator checks, the five-class leakage taxonomy with before-and-after
 measurements, the seven-learner benchmark and post-hoc ensemble, and the
 operational and equity analyses at explicit screening thresholds.
 
-## Author
+## Authors
 
-**MD Farhan** (22301430)
+**MD Farhan**
+Department of Computer Science and Engineering, BRAC University, Dhaka
 
 Data courtesy of The DHS Program and the National Institute of Population
 Research and Training, Bangladesh.
