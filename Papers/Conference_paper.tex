@@ -1,0 +1,676 @@
+%% IEEE Conference Paper -- BDHS Maternal and Child Health Risk Prediction
+%% Compile with pdfLaTeX. The source follows the supplied IEEE conference template.
+
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+% IEEE requires Times. IEEEtran asks the class for ptm, but under
+% XeTeX/Tectonic that shape is undefined in the TU encoding and LaTeX
+% silently falls back to Latin Modern. Asking explicitly works on every
+% engine, pdfLaTeX included.
+\usepackage{newtxtext}
+% Splits the reference list across both columns of the last page, which
+% otherwise ends after 45% of the left column and leaves the right empty.
+\usepackage{balance}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{url}
+\usepackage[hidelinks]{hyperref}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{Prediction of Maternal and Child Health Outcomes from the Bangladesh
+Demographic and Health Survey}
+
+\author{\IEEEauthorblockN{MD Farhan}
+\IEEEauthorblockA{\textit{Department of Computer Science and Engineering} \\
+\textit{Brac University}\\
+Dhaka, Bangladesh \\
+md.farhan@g.bracu.ac.bd}
+\and
+\IEEEauthorblockN{SM Sakib}
+\IEEEauthorblockA{\textit{Department of Computer Science and Engineering} \\
+\textit{Brac University}\\
+Dhaka, Bangladesh \\
+sm.sakib@g.bracu.ac.bd}}
+
+\maketitle
+
+\begin{abstract}
+Bangladesh has made substantial progress against maternal and child mortality
+over the past three decades, but the remaining risk is still considerable and
+unevenly distributed. Neonatal death occurs in 4\% of live births, 28.7\% of
+measured young children are stunted, and only 57.2\% of recent births occur in
+a health facility. Those most exposed to these outcomes are often the least
+able to reach care promptly. At an initial community-health visit, the worker
+usually has no laboratory measurements; the available information is closer
+to the household and reproductive history already captured by a national
+survey. We examine how useful that information is for early risk screening.
+The 2022 and 2017--18 Bangladesh Demographic and Health Surveys are combined
+into a leakage-audited dataset of 121,067 records, and five outcomes covering
+delivery, the neonatal period and early childhood are predicted. We compare
+Logistic Regression, Random Forest, XGBoost, LightGBM, CatBoost, RealMLP and
+TabM, together with a greedy post-hoc ensemble and the pretrained transformer
+TabPFN-3. All splits are grouped by maternal identity. Test ROC-AUC is between
+0.688 for underweight and 0.845 for facility delivery; the methods differ by
+no more than 0.07 on any target. Two checks temper this result. A model trained
+on 2017--18 preserves much of its ranking performance on 2022 but overpredicts
+prevalence by as much as 5.9 times, while sensitivity at a 30\% flag rate
+differs 5.7-fold across wealth quintiles. The limiting factor therefore seems
+to be the information recorded in the survey rather than the choice of model.
+\end{abstract}
+
+\begin{IEEEkeywords}
+maternal and child health, Demographic and Health Survey, clinical prediction,
+data leakage, temporal validation, algorithmic fairness, tabular learning,
+CatBoost, TabM, ensemble selection
+\end{IEEEkeywords}
+
+\section{Introduction}
+
+Bangladesh has substantially reduced maternal and under-five mortality, but
+the remaining burden is not shared evenly. Across the two survey rounds used
+here, neonatal death occurs in 4.0\% of live births, 28.7\% of measured
+children are stunted, and 57.2\% of recent births take place in a health
+facility. Facility delivery ranges from 34.0\% in the poorest wealth quintile
+to 82.6\% in the richest.
+
+During an initial antenatal contact, a community health worker can observe
+much the same broad characteristics represented in a household survey: age,
+parity, birth spacing, education, wealth, water and sanitation, and previous
+reproductive history. Laboratory measurements and biomarkers are not assumed
+to be available. The question is whether these variables can provide a useful
+early ranking of risk and retain that usefulness across survey rounds and
+socio-economic groups.
+
+Many Bangladesh DHS prediction studies use complete cases from a single
+module, focus on one outcome, and rely on random splits without formally
+checking for leakage. Near-perfect discrimination is hard to reconcile with
+the pooled accuracy reported in a recent DHS meta-analysis \cite{rao2025}.
+Here we use one harmonised pipeline for two rounds, split records by mother,
+select targets according to observed learnability, test transport over time,
+and examine performance by wealth stratum.
+
+The study makes four contributions: (i) a pooled corpus checked against
+round-specific indicators; (ii) a five-part leakage taxonomy with measurements
+before and after each control; (iii) a comparison of seven current tabular
+learners plus a post-hoc ensemble; and (iv) operational and equity analyses at
+clearly defined screening thresholds.
+
+\section{Related Work}
+
+Eight studies provide the context: six use Bangladesh DHS data directly, one
+combines six East African countries and several survey rounds, and one is a
+meta-analysis of expected performance. Seven appeared in 2024 or later.
+
+\subsection{Prediction Studies on Bangladesh DHS Data}
+Salam \textit{et al.} \cite{salam2025} used ten algorithms to predict four or
+more antenatal visits for 5,128 BDHS 2022 women. A random-forest variant led
+with 69.5\% accuracy and AUC 0.734, providing the closest external comparison
+for our facility-delivery target.
+
+Noor \textit{et al.} \cite{noor2025} predicted the maternal continuum of four
+antenatal visits, skilled facility delivery and postnatal contact within 48
+hours. In the same 5,128 women, random forest reached 82\% accuracy and AUC
+0.889, while only 25.3\% completed the continuum. We instead model stages
+separately, allowing the likely point of drop-out to be identified.
+
+Zoha \textit{et al.} \cite{zoha2025} predicted caesarean section from 2,490
+BDHS 2022 records and reported AUC 0.871 with 45.6\% prevalence, well above
+the 10--15\% considered clinically indicated by the World Health Organization.
+Because this signal may reflect health-system behaviour rather than obstetric
+need, we fitted but excluded the outcome from the final panel
+(Section~\ref{sec:targets}).
+
+Sultana \textit{et al.} \cite{sultana2025} compared six algorithms on 3,192
+complete BDHS 2022 mother--child records. XGBoost led at 80\% accuracy and AUC
+0.761, with SHAP highlighting gestational age and administrative division. The
+study also illustrates the attrition caused by requiring measured birth weight.
+
+Naznin \textit{et al.} \cite{naznin2025} reported 98.75\% accuracy and 99.79\%
+AUROC for under-five mortality among 4,913 BDHS 2022 respondents. Such
+discrimination is unusual for socio-demographic predictors and can indicate
+pre-split resampling or post-outcome features. We therefore treat it as a
+cautionary comparison; it also motivated our leakage audit, where neonatal
+death falls from ROC-AUC 0.967 to 0.773 after removing an arithmetic identity.
+
+Islam \textit{et al.} \cite{islam2024} modelled stunting, wasting and
+underweight in BDHS 2017--18. XGBoost reached 81.7\% accuracy and AUC 0.802
+for stunting, but 76.2\% accuracy and AUC 0.622 for wasting. This contrast is
+why we use PR-AUC rather than headline accuracy for model selection.
+
+\subsection{Pooling Rounds, and the Performance Envelope}
+Tadese \textit{et al.} \cite{tadese2024} pooled 27,691 children from DHS rounds
+between 2016 and 2021 across six East African countries to predict incomplete
+immunisation. XGBoost led at 79.0\% accuracy and AUC 0.86. The multi-round
+design and mostly maternal/reproductive predictors are directly relevant here.
+
+A meta-analysis of eleven DHS malnutrition studies \cite{rao2025} reports pooled
+accuracies of 68.92\% for stunting, 84.39\% for wasting and 73.60\% for
+underweight, with substantial heterogeneity. These values set a realistic
+reference for survey-based prediction and show that a connected
+maternal-and-child panel remains relatively unexplored.
+
+\subsection{Tabular Modelling Practice}
+Gradient-boosted trees remain strong general-purpose baselines
+\cite{xgboost,lightgbm,catboost}. TabArena \cite{tabarena} benchmarks sixteen
+models on fifty-one datasets, ranks CatBoost first among individual learners,
+and finds that diverse post-hoc ensembles can improve on single models. This
+motivates our greedy ensemble (Section~\ref{sec:models}), following Caruana
+\textit{et al.} \cite{caruana2004}. RealMLP and TabM are newer neural tabular
+models \cite{realmlp,tabm}; TabPFN \cite{tabpfn} is a transformer pretrained
+on synthetic tabular tasks. TRIPOD+AI \cite{tripod} and equality-of-opportunity
+criteria \cite{hardt2016} motivate our external and subgroup checks.
+
+\subsection{Identified Gap}
+The reviewed studies leave five gaps: connected maternal-and-child prediction,
+round pooling under one pipeline, leakage auditing, treatment of clustering,
+and wealth-stratified performance. We address all five and treat the resulting
+lower but defensible performance as a finding rather than a failure.
+
+\section{Dataset and Exploratory Analysis}
+
+\subsection{Source and Nested Cohorts}
+We use BDHS 2022 (DHS-8) and BDHS 2017--18 (DHS-7) \cite{bdhs2022}. Their
+Individual and Birth recodes were merged through one pipeline, producing
+121,067 records, 899 variables, 1,346 clusters and 45,458 mothers. Since DHS
+modules are not observed for every record, analyses use nested cohorts: broad
+mother variables, narrower birth histories, recent-birth maternity variables,
+and anthropometry for physically measured children.
+
+\begin{table}[t]
+\caption{Analysis cohorts and targets}
+\label{tab:cohorts}
+\centering
+\small
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}llr@{}}
+\toprule
+\textbf{Cohort} & \textbf{Targets} & \textbf{Records} \\
+\midrule
+births & neonatal death & 112,546 \\
+mother & equity analysis & 45,458 \\
+child & stunting, severe stunting, underweight & 11,954 \\
+recent birth & facility delivery & 10,773 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.78\textwidth]{figs/outcome_prevalence.png}
+\caption{Outcome prevalence with 95\% design-based intervals. The broad range
+of base rates motivates target-specific metrics and thresholds.}
+\label{fig:eda}
+\end{figure*}
+
+Figure~\ref{fig:eda} shows outcomes ranging from common pathway measures to
+rare adverse events, so accuracy alone is misleading. Missingness is treated
+as survey structure within each cohort, not as an automatic reason to remove a
+column. Ten published indicators were recomputed by round; all were within
+four percentage points of the published values. Stunting, for example, was
+23.22\% versus 23.6\% in 2022 and 30.72\% versus 31.0\% in 2017--18.
+
+\subsection{Targets and Selection}
+\label{sec:targets}
+The final panel contains facility delivery, neonatal death, stunting,
+underweight and severe stunting, with positive rates of 57.2\%, 4.0\%, 28.7\%,
+22.4\% and 7.9\%. Of fifteen candidates, fever, wasting and diarrhoea were
+difficult to learn; caesarean section reflected clinical decision-making; and
+pregnancy loss depended on recall timing. Incomplete immunisation fell from
+ROC-AUC 0.944 to 0.59 after restricting to the 12--23 month denominator and
+removing age, exposing age leakage.
+
+\section{Methodology}
+
+\subsection{Cleaning and Leakage}
+\label{sec:leakage}
+DHS files combine valid measurements, meaningful zeros and nonresponse codes.
+We decode them into missing values, true zeros and common numeric units, and
+namespace cluster and maternal identifiers by round. Feature blocks cover
+demographic, socio-economic, empowerment, household, reproductive,
+healthcare-access and child variables; 96--118 features remain per target.
+
+Five leakage forms are audited: post-outcome variables, same-moment
+co-measurements, definitional variables, arithmetic identities, and informative
+missingness. For neonatal death, retaining the fertility identity gives
+ROC-AUC 0.967, versus 0.773 after blocking it; a survivor-only age variable
+gives 0.987. Both values and observation patterns therefore require inspection.
+
+\begin{table}[t]
+\caption{Sensitivity to leakage controls for neonatal death}
+\label{tab:leakage}
+\centering
+\small
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}lrl@{}}
+\toprule
+\textbf{Feature set} & \textbf{ROC-AUC} & \textbf{Audit interpretation} \\
+\midrule
+Leakage-audited & 0.773 & Intended early-risk estimate \\
+Fertility identity retained & 0.967 & Arithmetic label proxy \\
+Survivor-only age retained & 0.987 & Missingness is the label \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\subsection{Feature Representation}
+Boosted trees use missingness natively. Linear and neural paths use median
+imputation with indicators, robust scaling and rare-level pooling; ordered DHS
+scales are ordinal-encoded. Splits are grouped by maternal identity because
+90\% of birth rows belong to mothers appearing more than once.
+
+\subsection{Sampling and Outcome Construction}
+Each target is constructed only within its valid DHS universe: facility
+delivery among births in the preceding five years, neonatal death from birth
+history, and anthropometric outcomes among children with DHS height and weight
+measurements. An unadministered module is not treated as a negative response.
+Feature selection follows the same cohort-specific rule.
+
+Sampling weights estimate national prevalence and design-based intervals;
+cluster identifiers are retained for uncertainty checks. Held-out records are
+used for ROC-AUC and PR-AUC, so weights do not change groups or reveal outcomes
+during training. The average design effect is 2.19, making independent-row
+intervals about 1.48 times too narrow. Round-specific reconstruction guards
+against a pooled prevalence representing neither survey population.
+
+\subsection{Models and the Ensemble}
+\label{sec:models}
+Seven learners are benchmarked: logistic regression; random forest; XGBoost;
+LightGBM; CatBoost \cite{xgboost,lightgbm,catboost}; RealMLP; and TabM
+\cite{realmlp,tabm}. TabPFN-3 \cite{tabpfn} is evaluated separately with the
+same split, preprocessing and row cap. All learners use published defaults;
+there is no hyperparameter search, so the comparison is between model families.
+
+\textbf{What ``Ensemble'' means here.} This term denotes a defined blend. After
+fitting the seven learners, greedy forward selection with replacement
+\cite{caruana2004} runs for fifteen rounds, appending the already-fitted learner
+that most improves PR-AUC on an inner validation split. A learner selected $k$
+times receives weight $k/15$; no new model or test-set weight is fitted.
+Table~\ref{tab:blend} reports the target-specific compositions.
+
+Operating thresholds minimise an explicit false-negative cost while respecting
+a maximum flag rate of 30\%, used here as a screening-capacity constraint.
+
+\begin{table}[t]
+\caption{Composition of the winning ensembles}
+\label{tab:blend}
+\centering
+\small
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+\textbf{Target} & \textbf{RF} & \textbf{XGB} & \textbf{LGBM} &
+\textbf{CatB} & \textbf{RealMLP} & \textbf{TabM} \\
+\midrule
+facility delivery & 1 & 2 & 1 & 5 & 6 & --- \\
+neonatal death    & --- & --- & 8 & --- & 6 & 1 \\
+severe stunting   & 4 & --- & 2 & 7 & 2 & --- \\
+\bottomrule
+\end{tabular}}
+\par\vspace{2pt}\parbox{\columnwidth}{\footnotesize Entries are selection counts out of fifteen
+greedy rounds, so each row sums to fifteen; a dash means the learner was never
+selected and carries weight zero. Stunting and underweight are absent because
+a single model won those targets outright.}
+\end{table}
+
+\subsection{Validation and Extensions}
+Internal evaluation uses grouped train--test splits and 400 bootstrap resamples
+for confidence intervals; temporal evaluation trains on 2017--18 and tests on
+2022. Conformal prediction uses a held-out calibration split, survival analysis
+uses person-period rows, and multi-task learning jointly predicts the three
+nutrition outcomes. These are secondary analyses.
+
+Figure~\ref{fig:pipeline} outlines the analysis from survey recodes to
+cohort-specific risk scores.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figs/fig_pipeline.png}
+\caption{Analysis pipeline. Survey recodes are decoded once, then passed
+through cohort-specific feature and leakage rules before grouped model fitting
+and risk reporting.}
+\label{fig:pipeline}
+\end{figure}
+
+\section{Results}
+
+\subsection{Internal Performance}
+Table~\ref{tab:results} lists the strongest model per target. ROC-AUC ranges
+from 0.688 to 0.845, with PR-AUC interpreted against each base rate. The full
+matrix in Table~\ref{tab:models} shows close model families: the eight
+approaches span 0.025 ROC-AUC for facility delivery, 0.030 for stunting and
+0.070 for neonatal death. In the last case, random forest's recall falls to
+0.001 at the default cut-point on a 4\% base rate, indicating a threshold issue
+rather than failed ranking. The earlier nine-model panel changed no target by
+more than 0.02 ROC-AUC.
+
+Two winners differ from the ROC-AUC leaders because selection uses PR-AUC.
+RealMLP leads stunting on ROC-AUC by 0.002, while CatBoost leads PR-AUC by
+0.005; the ensemble leads underweight on ROC-AUC by 0.003, while TabM leads
+PR-AUC by 0.003. At a 22.4\% base rate, PR-AUC is more relevant to screening.
+
+\begin{table}[t]
+\caption{Best model per target, with 95\% bootstrap intervals.
+\textnormal{\textbf{Ensemble}} is the greedy PR-AUC-weighted blend of the
+seven benchmarked learners defined in Section~\ref{sec:models}}
+\label{tab:results}
+\centering
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Target} & \textbf{Model} & \textbf{ROC-AUC} & \textbf{PR-AUC} \\
+\midrule
+facility delivery & Ensemble & 0.845 [0.828, 0.859] & 0.878 \\
+neonatal death & Ensemble & 0.773 [0.756, 0.789] & 0.209 \\
+stunted & CatBoost & 0.707 [0.687, 0.730] & 0.526 \\
+severe stunting & Ensemble & 0.700 [0.660, 0.738] & 0.192 \\
+underweight & TabM & 0.688 [0.661, 0.712] & 0.415 \\
+\bottomrule
+\end{tabular}
+\par\vspace{2pt}\parbox{\columnwidth}{\footnotesize Winners are selected on PR-AUC. The
+composition of each ensemble is given in Table~\ref{tab:blend}; stunting and
+underweight were won by single models.}
+\end{table}
+
+\begin{table}[t]
+\caption{Test ROC-AUC by learner and target.
+\textnormal{\textbf{Ensemble}} is not an eighth learner: it is the greedy
+PR-AUC-weighted blend of the seven rows above it}
+\label{tab:models}
+\centering
+\small
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+& \textbf{Facility} & \textbf{Neonatal} & & \textbf{Severe} &
+\textbf{Under-} \\
+\textbf{Learner} & \textbf{delivery} & \textbf{death} & \textbf{Stunted} &
+\textbf{stunting} & \textbf{weight} \\
+\midrule
+Logistic Reg. & 0.839 & 0.719 & 0.686 & 0.687 & 0.681 \\
+Random Forest & 0.822 & 0.703 & 0.683 & 0.679 & 0.680 \\
+XGBoost       & 0.820 & 0.742 & 0.678 & 0.671 & 0.636 \\
+LightGBM      & 0.840 & 0.771 & 0.703 & 0.665 & 0.672 \\
+CatBoost      & 0.843 & 0.748 & 0.706 & 0.698 & 0.679 \\
+RealMLP       & 0.841 & 0.750 & \textbf{0.708} & 0.696 & 0.687 \\
+TabM          & 0.842 & 0.707 & 0.702 & 0.675 & 0.687 \\
+\midrule
+\textbf{Ensemble} & \textbf{0.845} & \textbf{0.773} & 0.705 &
+\textbf{0.700} & \textbf{0.690} \\
+\midrule
+range         & 0.025 & 0.070 & 0.030 & 0.035 & 0.054 \\
+\bottomrule
+\end{tabular}}
+\par\vspace{2pt}\parbox{\columnwidth}{\footnotesize The ensemble is defined in
+Section~\ref{sec:models} and composed in Table~\ref{tab:blend}. Best per
+column in bold; the last row is the spread between the largest and smallest
+value above it. Values are point estimates on the held-out split, whereas
+Table~\ref{tab:results} reports bootstrap medians, so the two can differ in
+the third decimal.}
+\end{table}
+
+At cost-sensitive operating points, recall increases from 0.167 to 0.502 for
+underweight and from 0.123 to 0.425 for severe stunting, with more false
+alarms. Split conformal prediction provides 89.3--90.9\% coverage at nominal
+90\%.
+
+\subsection{A Pretrained Transformer Changes Little}
+\label{sec:tabpfn}
+TabPFN-3 was tested with the same grouped split, native-missingness
+preprocessing and 10{,}000-row context cap. Its PR-AUC values were 0.872,
+0.166, 0.516, 0.185 and 0.417 for facility delivery, neonatal death,
+stunting, severe stunting and underweight. It trails the incumbent on three
+targets and leads on two by 0.0005 and 0.0046 PR-AUC, only 0.5\% and 5.6\% of
+the corresponding interval widths. Its severe-stunting ROC-AUC is 0.711, but
+the PR-AUC ranking is unchanged. The same performance range under a different
+inductive bias supports an informational, rather than architectural, ceiling.
+
+\subsection{Robustness and Secondary Analyses}
+The ensemble improved three targets by at most 0.002 and was slightly worse on
+two. This agrees with Table~\ref{tab:models}: once the data set the error
+ceiling, model diversity leaves little error to cancel. A tuned nine-model
+panel previously reached ROC-AUC 0.848, 0.769, 0.694, 0.699 and 0.678 for the
+five targets; the current untuned panel reached 0.845, 0.773, 0.707, 0.700 and
+0.688. The change in algorithm panel does not alter the conclusion.
+
+The person-period formulation expanded 104,025 births into 388,016 rows. The
+estimated mortality hazard was 3.99\% in month one, 1.49\% in months 1--12,
+0.46\% in months 12--24 and 0.65\% in months 24--60. A child observed at 30
+months is censored after three completed intervals, not treated as a five-year
+survivor. Multi-task learning improved the no-sharing ablation by 0.010 mean
+ROC-AUC but remained below single-task CatBoost.
+
+\subsection{Temporal Validation}
+Models trained on 2017--18 preserve much of their ranking ability on 2022, but
+their probabilities do not transport well (Table~\ref{tab:temporal}).
+
+\begin{table}[t]
+\caption{Temporal validation: train 2017--18, test 2022}
+\label{tab:temporal}
+\centering
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\textbf{Target} & \textbf{Int.} & \textbf{Temp.} & \textbf{$\Delta$} & \textbf{Pred./Obs.} \\
+\midrule
+facility delivery & 0.839 & 0.796 & $-0.043$ & 0.88 \\
+neonatal death & 0.766 & 0.687 & $-0.079$ & 5.90 \\
+stunted & 0.708 & 0.701 & $-0.007$ & 1.57 \\
+severe stunting & 0.686 & 0.682 & $-0.004$ & 2.81 \\
+underweight & 0.677 & 0.672 & $-0.005$ & 1.44 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figs/fig_temporal.png}
+\caption{Calibration drift across survey rounds. Bars compare observed 2022
+prevalence with mean risk from a model trained on 2017--18; labels give the
+ratios in Table~\ref{tab:temporal}. The companion internal-versus-temporal
+ROC-AUC panel was omitted because it repeated columns two and three of the
+table.}
+\label{fig:temporal}
+\end{figure}
+
+The nutrition targets lose only 0.004--0.007 ROC-AUC across rounds, yet
+predicted prevalence is 1.44 to 5.90 times observed prevalence. For neonatal
+death, mean predicted risk is 21.4\% versus an observed 3.6\%. The model may
+still rank cases for triage after transport, but probabilities and thresholds
+need recalibration.
+
+\subsection{Subgroup Performance}
+\label{sec:fairness}
+Figure~\ref{fig:fairness} compares ROC-AUC and recall at a common 30\% flag rate
+by wealth quintile. Stunting recall is 0.685 in the poorest and 0.121 in the
+richest, a 5.7-fold difference. For facility delivery, recall is 0.119 in the
+poorest and 0.812 in the richest. Discrimination is steadier than thresholded
+sensitivity, so a global cut-point needs stratum-specific reporting or
+threshold stratification \cite{hardt2016}.
+
+\subsection{Operational Implications}
+The 30\% flag rate is a capacity scenario, not a clinical recommendation. With
+no cap, the tenfold false-negative penalty for neonatal death would flag most
+births, which is impractical. Under the cap, the output is a ranked referral
+list rather than a diagnosis. A service could recalibrate on a small
+current-round sample and choose a threshold with its staffing and referral
+capacity.
+
+% Promoted to a full-width float. Two panels side by side inside a single
+% column scale the tick and legend text down to about 4 pt -- the same defect
+% the pipeline figure had -- and spanning both columns fixes it without
+% touching the plot itself.
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.86\textwidth]{figs/fig_fairness.png}
+\caption{Subgroup performance by wealth quintile. Discrimination varies less
+than sensitivity at a single global threshold.}
+\label{fig:fairness}
+\end{figure*}
+
+\section{Discussion}
+
+The main finding is that survey information, not model capacity, limits
+performance. The seven linear, tree-based and neural learners remain within
+0.07 ROC-AUC on every target. Leakage auditing and maternal-grouped validation
+explain more of the gap from implausibly high published values than changing
+the learner.
+
+Limitations are structural: DHS lacks blood pressure, glucose and biomarkers;
+the records are retrospective; and 65.7\% of the measured-child cohort comes
+from 2017--18. Results are associational and need prospective validation.
+Future work should add facility supply variables, test recalibration on a
+held-out period, and assess whether risk-ranked triage improves outcomes.
+
+Nutrition targets are correlated (pairwise phi 0.39--0.51) and are not
+independent clinical syndromes. The survey does not show whether flagged women
+received effective interventions, and the transport experiment covers one
+historical gap rather than future policy or climate shocks. All learners used
+defaults; broader search might improve a score but would not remove the need
+for leakage, temporal and subgroup audits.
+
+\subsection{Recommended Reporting Practice}
+Future DHS prediction studies should report the valid universe, record count
+and positive rate for each target rather than one pooled denominator. Predictors
+should be labelled by information time (before contact, same interview, or
+after outcome) so leakage is auditable. Repeated mothers, siblings and survey
+clusters should also define resampling groups; a random row split is not
+independent when households repeat.
+
+Evaluation should include internal and temporal discrimination, calibration or
+predicted-to-observed prevalence, and thresholded sensitivity by relevant
+socio-economic strata. Global ROC-AUC alone cannot establish safe transport or
+equity. Screening reports should state the flag-rate constraint, false-negative
+cost, recalibration sample and referral capacity with the threshold.
+
+\subsection{Reproducibility and Audit Trail}
+Data preparation, exploration, modelling and testing are separate rerunnable
+stages. The cleaned Parquet table, column dictionary, target registry and model
+manifest are retained. The manifest records each target's feature block,
+leakage blacklist, split groups and model family, so a changed valid universe
+changes the cohort definition rather than every model silently.
+
+Before training results are interpreted, EDA compares weighted prevalence with
+published round-specific indicators, inspects missingness by module and cohort,
+and checks correlations for definitional duplicates. Testing stores
+predictions, bootstrap indices, threshold decisions and subgroup labels, so
+temporal and wealth analyses reuse the aggregate predictions. These artefacts
+also permit one target to be rerun after a new survey round is added.
+
+\section{Conclusion}
+
+Using household survey variables alone, a two-round leakage-audited BDHS
+pipeline ranks five maternal and child outcomes with test ROC-AUC from 0.688
+to 0.845. Linear, tree-based and neural learners, their greedy ensemble, and a
+pretrained tabular transformer all fall within this range, placing the ceiling
+in the data rather than the algorithm.
+
+Two audits determine usability. Temporal transport preserves ranking better
+than calibration: nutrition targets lose less than 0.007 ROC-AUC, but predicted
+prevalence is 1.44--5.90 times observed, requiring current-sample
+recalibration. A global threshold also creates a 5.7-fold sensitivity gap
+across wealth quintiles, with direction varying by outcome. Thus the practical
+output is a ranked referral list with a stated flag rate, false-negative cost
+and stratum-specific sensitivity, not a probability taken at face value.
+
+\section*{Acknowledgment}
+The authors thank the Demographic and Health Surveys Program and the National
+Institute of Population Research and Training, Bangladesh, for providing the
+survey data used in this study.
+
+% No \clearpage here. It forced the reference list onto a page of its own and
+% left three quarters of the preceding page blank; \balance alone evens the
+% two columns of whatever page the list happens to end on.
+\balance
+\begin{thebibliography}{00}
+
+\bibitem{rao2025} B. Rao \textit{et al.}, ``Machine learning in predicting
+child malnutrition: a meta-analysis of Demographic and Health Surveys data,''
+\textit{International Journal of Environmental Research and Public Health},
+vol. 22, no. 3, p. 449, 2025.
+
+\bibitem{salam2025} M. A. Salam, M. M. Islam, and M. R. Karim, ``Machine
+learning algorithms for predicting and identifying the influencing predictors
+of antenatal care visits among women in Bangladesh: evidence from BDHS 2022
+data,'' \textit{PLOS ONE}, 2025.
+
+\bibitem{noor2025} S. T. A. Noor, R. B. Islam, S. Yeasar, and S. Siddique,
+``Machine learning-based prediction of maternal continuum of care completion:
+evidence from Bangladesh Demographic and Health Survey 2022,''
+\textit{Array}, 2025.
+
+\bibitem{zoha2025} S. Zoha \textit{et al.}, ``Identifying determinants and
+predicting cesarean section delivery among Bangladeshi women using machine
+learning: insight from BDHS 2022 data,'' \textit{PLOS Global Public Health},
+2025.
+
+\bibitem{sultana2025} N. Sultana \textit{et al.}, ``Machine learning based
+prediction of low birth weight and its associated risk factors: insights from
+the Bangladesh Demographic and Health Survey 2022,'' \textit{PLOS Global
+Public Health}, 2025.
+
+\bibitem{naznin2025} S. Naznin \textit{et al.}, ``Identifying determinants of
+under-5 mortality in Bangladesh: a machine learning approach with BDHS 2022
+data,'' \textit{PLOS ONE}, 2025.
+
+\bibitem{islam2024} M. M. Islam \textit{et al.}, ``Prediction of
+undernutrition and identification of its influencing predictors among
+under-five children in Bangladesh using explainable machine learning
+algorithms,'' \textit{PLOS ONE}, vol. 19, no. 12, e0315393, 2024.
+
+\bibitem{tadese2024} Z. B. Tadese \textit{et al.}, ``Prediction of incomplete
+immunization among under-five children in East Africa from recent demographic
+and health surveys: a machine learning approach,'' \textit{Scientific
+Reports}, vol. 14, 2024.
+
+\bibitem{xgboost} T. Chen and C. Guestrin, ``XGBoost: A scalable tree boosting
+system,'' in \textit{Proc. 22nd ACM SIGKDD}, 2016, pp. 785--794.
+
+\bibitem{lightgbm} G. Ke \textit{et al.}, ``LightGBM: A highly efficient
+gradient boosting decision tree,'' in \textit{Advances in Neural Information
+Processing Systems}, vol. 30, 2017.
+
+\bibitem{catboost} L. Prokhorenkova \textit{et al.}, ``CatBoost: unbiased
+boosting with categorical features,'' in \textit{Advances in Neural
+Information Processing Systems}, vol. 31, 2018.
+
+\bibitem{tabarena} N. Erickson \textit{et al.}, ``TabArena: a living
+benchmark for machine learning on tabular data,'' in \textit{Advances in
+Neural Information Processing Systems, Datasets and Benchmarks Track}, 2025.
+
+\bibitem{caruana2004} R. Caruana, A. Niculescu-Mizil, G. Crew, and A. Ksikes,
+``Ensemble selection from libraries of models,'' in \textit{Proc. 21st Int.
+Conf. Machine Learning (ICML)}, 2004.
+
+\bibitem{realmlp} Y. Gorishniy \textit{et al.}, ``RealMLP: Robust MLP for
+tabular data,'' arXiv:2402.06172, 2024.
+
+\bibitem{tabm} Y. Gorishniy \textit{et al.}, ``TabM: Advancing tabular deep
+learning with parameter-efficient ensembling,'' in \textit{Proc. ICLR}, 2025.
+
+\bibitem{tabpfn} N. Hollmann \textit{et al.}, ``Accurate predictions on
+small data with a tabular foundation model,'' \textit{Nature}, vol. 637,
+no. 8045, pp. 319--326, 2025.
+
+\bibitem{tripod} G. S. Collins \textit{et al.}, ``TRIPOD+AI statement:
+updated guidance for reporting clinical prediction models that use regression
+or machine learning methods,'' \textit{BMJ}, vol. 385, e078378, 2024.
+
+\bibitem{hardt2016} M. Hardt, E. Price, and N. Srebro, ``Equality of
+opportunity in supervised learning,'' in \textit{Advances in Neural
+Information Processing Systems}, vol. 29, 2016.
+
+\bibitem{bdhs2022} National Institute of Population Research and Training
+(NIPORT), Ministry of Health and Family Welfare, Bangladesh, and ICF,
+\textit{Bangladesh Demographic and Health Survey 2022}, Dhaka, Bangladesh
+and Rockville, MD, USA, 2024.
+\end{thebibliography}
+
+\end{document}
