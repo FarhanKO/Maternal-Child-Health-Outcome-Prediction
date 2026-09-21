@@ -4,7 +4,7 @@
 over GitHub's 100 MB per-file limit — because a `GreedyEnsemble` pickles every
 member pipeline it blends, and one of those members is a neural network.
 
-Drive link -> https://drive.google.com/drive/folders/1kFbGhpGmt3nyVWXepkFxYQ2p6HtAEPJb?usp=drive_link
+Model's link -> https://huggingface.co/FarhanKO/mch-risk-models/tree/main
 
 ```bash
 python train.py          # writes everything below
