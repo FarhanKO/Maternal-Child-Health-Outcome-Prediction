@@ -1,0 +1,92 @@
+{
+  "facility_delivery": {
+    "file": "facility_delivery.joblib",
+    "phase": "delivery",
+    "kind": "pathway",
+    "positive_label": "delivered in a health facility",
+    "model": "Ensemble",
+    "best_params": {
+      "Random Forest": 1,
+      "XGBoost": 2,
+      "LightGBM": 1,
+      "CatBoost": 5,
+      "RealMLP": 6
+    },
+    "threshold": 0.794,
+    "n_features": 116,
+    "conformal_alpha": 0.1,
+    "conformal_quantile": 0.6791,
+    "test_recall_at_0.5": 0.8315,
+    "test_pr_auc": 0.878,
+    "test_roc_auc": 0.8447
+  },
+  "neonatal_death": {
+    "file": "neonatal_death.joblib",
+    "phase": "newborn",
+    "kind": "adverse",
+    "positive_label": "died within 28 days of birth",
+    "model": "Ensemble",
+    "best_params": {
+      "LightGBM": 8,
+      "RealMLP": 6,
+      "TabM": 1
+    },
+    "threshold": 0.4195,
+    "n_features": 96,
+    "conformal_alpha": 0.1,
+    "conformal_quantile": 0.4177,
+    "test_recall_at_0.5": 0.1873,
+    "test_pr_auc": 0.2083,
+    "test_roc_auc": 0.7727
+  },
+  "stunted": {
+    "file": "stunted.joblib",
+    "phase": "child",
+    "kind": "adverse",
+    "positive_label": "height-for-age below -2 SD",
+    "model": "CatBoost",
+    "best_params": {},
+    "threshold": 0.357,
+    "n_features": 104,
+    "conformal_alpha": 0.1,
+    "conformal_quantile": 0.7492,
+    "test_recall_at_0.5": 0.2597,
+    "test_pr_auc": 0.5231,
+    "test_roc_auc": 0.7063
+  },
+  "severe_stunting": {
+    "file": "severe_stunting.joblib",
+    "phase": "child",
+    "kind": "adverse",
+    "positive_label": "height-for-age below -3 SD",
+    "model": "Ensemble",
+    "best_params": {
+      "Random Forest": 4,
+      "LightGBM": 2,
+      "CatBoost": 7,
+      "RealMLP": 2
+    },
+    "threshold": 0.3258,
+    "n_features": 104,
+    "conformal_alpha": 0.1,
+    "conformal_quantile": 0.4957,
+    "test_recall_at_0.5": 0.1229,
+    "test_pr_auc": 0.1846,
+    "test_roc_auc": 0.7005
+  },
+  "underweight_child": {
+    "file": "underweight_child.joblib",
+    "phase": "child",
+    "kind": "adverse",
+    "positive_label": "weight-for-age below -2 SD",
+    "model": "TabM",
+    "best_params": {},
+    "threshold": 0.2759,
+    "n_features": 104,
+    "conformal_alpha": 0.1,
+    "conformal_quantile": 0.7424,
+    "test_recall_at_0.5": 0.1667,
+    "test_pr_auc": 0.4119,
+    "test_roc_auc": 0.687
+  }
+}
