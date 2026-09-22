@@ -1,0 +1,29 @@
+[theme]
+base = "light"
+primaryColor = "#0e9f8e"
+backgroundColor = "#f5f7fb"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#0f172a"
+linkColor = "#0b7f72"
+font = "Inter, sans-serif"
+headingFont = "Inter, sans-serif"
+codeFont = "JetBrains Mono, monospace"
+baseRadius = "0.9rem"
+buttonRadius = "0.75rem"
+borderColor = "rgba(15, 23, 42, 0.08)"
+showSidebarBorder = false
+
+[theme.sidebar]
+backgroundColor = "#ffffff"
+
+[server]
+headless = true
+maxUploadSize = 50
+enableXsrfProtection = true
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"
+showErrorDetails = "stacktrace"
