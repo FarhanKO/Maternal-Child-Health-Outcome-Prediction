@@ -8,3 +8,15 @@ data/processed/*
 # Keep folder structure intact using .gitkeep if needed
 !data/raw/.gitkeep
 !data/processed/.gitkeep
+
+# Trained bundles are fetched at runtime (see DEPLOYMENT.md); never commit them
+*.joblib
+
+# Python / tooling
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+.env
+.streamlit/secrets.toml
