@@ -1,0 +1,36 @@
+# Runtime requirements for the dashboard and the API.
+#
+# Pinned to the versions the bundles were pickled with (pandas 3 / sklearn 1.8
+# objects do not unpickle cleanly under older majors). Python 3.11+.
+#
+# torch comes from the CPU index: the PyPI wheel drags in ~3 GB of CUDA
+# libraries that no free-tier host can fit and that inference never uses.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# --- scoring core ----------------------------------------------------------
+numpy==2.4.6
+pandas==3.0.3
+scipy==1.17.1
+scikit-learn==1.8.0
+joblib==1.5.3
+imbalanced-learn==0.14.1
+xgboost==3.2.0
+lightgbm==4.7.0
+catboost==1.2.10
+torch==2.11.0+cpu
+pytabkit==1.7.3
+pytorch-lightning==2.6.5
+torchmetrics==1.9.0
+
+# --- model fetching ---------------------------------------------------------
+huggingface_hub>=0.30
+requests>=2.32
+
+# --- dashboard ----------------------------------------------------------------
+streamlit==1.62.0
+plotly>=6.0
+
+# --- API ------------------------------------------------------------------------
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2.7
