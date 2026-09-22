@@ -31,6 +31,69 @@ PLOTLY_CONFIG = {"displayModeBar": False, "responsive": True}
 def inject_theme() -> None:
     css = (ASSETS / "style.css").read_text(encoding="utf-8")
     st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+    _inject_background()
+
+
+# The cursor-reactive background. Streamlit strips <script> from markdown, so
+# the code is delivered through a zero-height component iframe (same origin,
+# via srcdoc) and copied into the parent document, where it runs in the page's
+# own realm and survives reruns. Idempotent: a second run finds #mch-bg and
+# stops. Falls back to the static CSS gradient if the parent is unreachable.
+_BACKGROUND_JS = """
+(function () {
+  var doc = document;
+  if (doc.getElementById('mch-bg')) return;
+  var bg = doc.createElement('div'); bg.id = 'mch-bg';
+  var grid = doc.createElement('div'); grid.id = 'mch-grid';
+  var glow = doc.createElement('div'); glow.id = 'mch-glow';
+  bg.appendChild(grid); bg.appendChild(glow);
+  doc.body.prepend(bg);
+  doc.body.classList.add('mch-js');
+
+  var W = function () { return doc.documentElement.clientWidth || 1; };
+  var H = function () { return doc.documentElement.clientHeight || 1; };
+  var tx = W() * 0.55, ty = H() * 0.30, x = tx, y = ty;
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var idle = 0, drift = 0;
+
+  doc.addEventListener('mousemove', function (e) { tx = e.clientX; ty = e.clientY; idle = 0; }, { passive: true });
+  doc.addEventListener('touchmove', function (e) {
+    if (e.touches && e.touches[0]) { tx = e.touches[0].clientX; ty = e.touches[0].clientY; idle = 0; }
+  }, { passive: true });
+
+  function tick() {
+    idle += 1;
+    if (idle > 180 && !reduce) {           // no input for ~3 s: wander slowly
+      drift += 0.004;
+      tx = W() * (0.5 + 0.30 * Math.cos(drift));
+      ty = H() * (0.4 + 0.22 * Math.sin(drift * 1.3));
+    }
+    var k = reduce ? 1 : 0.075;
+    x += (tx - x) * k; y += (ty - y) * k;
+    var px = x / W() - 0.5, py = y / H() - 0.5;
+    var st = bg.style;
+    st.setProperty('--mx', x.toFixed(1) + 'px');
+    st.setProperty('--my', y.toFixed(1) + 'px');
+    st.setProperty('--px', (px * 36).toFixed(2) + 'px');
+    st.setProperty('--py', (py * 36).toFixed(2) + 'px');
+    window.requestAnimationFrame(tick);
+  }
+  tick();
+})();
+"""
+
+
+def _inject_background() -> None:
+    import streamlit.components.v1 as components
+
+    loader = (
+        "<script>(function(){try{var p=window.parent;if(!p||!p.document)return;"
+        "if(p.document.getElementById('mch-bg'))return;"
+        "var s=p.document.createElement('script');s.id='mch-bg-script';"
+        "s.textContent=" + repr(_BACKGROUND_JS) + ";"
+        "p.document.body.appendChild(s);}catch(e){}})();</script>"
+    )
+    components.html(loader, height=0)
 
 
 def _e(text) -> str:
