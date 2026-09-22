@@ -1,0 +1,15 @@
+.git
+.gitignore
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.venv
+venv
+notebooks
+Papers
+dataset
+docs
+*.ipynb
+*.parquet
+.streamlit/secrets.toml
+.claude
