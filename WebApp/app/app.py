@@ -38,7 +38,7 @@ def _sidebar_status() -> None:
         if base:
             status_line("REST API linked", "ok")
         else:
-            status_line("REST API not linked", "off")
+            status_line("API: in-process scoring (no remote service)", "off")
         md('<div style="font-size:0.74rem;color:#64748b;margin-top:0.8rem;line-height:1.5">'
            'Population-level estimates from socio-demographic inputs. '
            'Not a diagnosis and not a substitute for clinical assessment.</div>')
