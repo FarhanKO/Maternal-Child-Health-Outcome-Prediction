@@ -48,6 +48,46 @@
   background: transparent;
 }
 
+/* Cursor-reactive background. Built by app/ui/theme.py at runtime as a
+   fixed layer behind the app; when it exists (body.mch-js) the static
+   gradient above is switched off so the two never stack. */
+body.mch-js .stApp {
+  background-image: none;
+  background-color: transparent;
+  animation: none;
+}
+#mch-bg {
+  --mx: 55vw; --my: 30vh; --px: 0px; --py: 0px;
+  position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden;
+  background-color: #f5f7fb;
+  background-image:
+    radial-gradient(60% 50% at 8% 6%,  rgba(14, 159, 142, 0.22), transparent 62%),
+    radial-gradient(50% 45% at 92% 12%, rgba(108, 92, 231, 0.18), transparent 62%),
+    radial-gradient(55% 55% at 72% 96%, rgba(240, 98, 146, 0.15), transparent 62%),
+    radial-gradient(40% 40% at 20% 90%, rgba(14, 159, 142, 0.10), transparent 62%);
+  background-size: 112% 112%;
+  background-position: calc(50% + var(--px)) calc(50% + var(--py));
+}
+#mch-grid {
+  position: absolute; inset: 0;
+  background-image: radial-gradient(rgba(15, 23, 42, 0.16) 1px, transparent 1.3px);
+  background-size: 26px 26px;
+  -webkit-mask-image: radial-gradient(360px circle at var(--mx) var(--my), rgba(0,0,0,0.95), transparent 72%);
+          mask-image: radial-gradient(360px circle at var(--mx) var(--my), rgba(0,0,0,0.95), transparent 72%);
+}
+#mch-glow {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(420px circle at var(--mx) var(--my), rgba(14, 159, 142, 0.20), transparent 62%),
+    radial-gradient(760px circle at calc(var(--mx) + 120px) calc(var(--my) + 60px), rgba(108, 92, 231, 0.12), transparent 66%),
+    radial-gradient(900px circle at calc(var(--mx) - 160px) calc(var(--my) - 80px), rgba(240, 98, 146, 0.08), transparent 70%);
+  filter: saturate(1.15);
+}
+/* The zero-height iframe that delivers the script must not take space. */
+iframe[title="st.iframe"][height="0"], [data-testid="stCustomComponentV1"][height="0"] {
+  display: block; height: 0 !important; margin: 0 !important;
+}
+
 [data-testid="stMainBlockContainer"], .block-container {
   padding-top: 1.6rem;
   padding-bottom: 4rem;
