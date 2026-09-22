@@ -1,3 +1,14 @@
+---
+title: Maternal & Child Health Risk
+emoji: 🤱
+colorFrom: green
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+short_description: Five maternal & child outcomes predicted from the Bangladesh DHS
+---
+
 # Predicting Maternal and Child Health Outcomes from the Bangladesh DHS
 
 Five maternal and child health outcomes — **where she delivers → whether the
