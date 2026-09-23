@@ -7,7 +7,7 @@ transport and equity audits that decide whether the numbers mean anything.
 
 **121,067 records · 45,458 mothers · 1,346 clusters · BDHS 2017-18 + 2022**
 
-Weblink: https://maternal-child-health-outcome.streamlit.app/
+**[Live demo →](#)** *https://maternal-child-health-outcome.streamlit.app/*
 
 > **The finding is that information content, not model capacity, sets the
 > ceiling.** Seven learners spanning linear, tree-based and neural families, a
