@@ -5,9 +5,9 @@ baby survives → how the child grows** — predicted from two pooled rounds of 
 Bangladesh Demographic and Health Survey, with the leakage, calibration,
 transport and equity audits that decide whether the numbers mean anything.
 
-**121,067 records · 45,458 mothers · 1,346 clusters · BDHS 2017-18 + 2022**
-
 **[Live demo →](#)** *https://maternal-child-health-outcome.streamlit.app/*
+
+**121,067 records · 45,458 mothers · 1,346 clusters · BDHS 2017-18 + 2022**
 
 > **The finding is that information content, not model capacity, sets the
 > ceiling.** Seven learners spanning linear, tree-based and neural families, a
