@@ -12,6 +12,7 @@ import sys
 import time
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -170,6 +171,122 @@ class TestEngineContract:
         v024 = next(f for f in s["fields"] if f["name"] == "v024")
         assert set(v024["allowed"]) >= {"dhaka", "sylhet", "khulna"}
         assert "__missing__" not in v024["allowed"]
+
+
+# ===========================================================================
+# 3b. How unasked fields are resolved (core/defaults.py).
+# ===========================================================================
+@needs_bundles
+class TestFillStrategy:
+
+    def test_wealth_score_follows_the_quintile(self, engine):
+        """v190 is a binning of v191, so the two must not contradict.
+
+        The flat template's -31,590 is a middle-quintile household; handing
+        that to the model alongside "richest" is the contradiction this
+        replaces.
+        """
+        poorest = engine.assess({"v190": "poorest", "v025": "rural"},
+                                include_record=True)["record_used"]["v191"]
+        richest = engine.assess({"v190": "richest", "v025": "urban"},
+                                include_record=True)["record_used"]["v191"]
+        assert poorest < 0 < richest
+        assert richest - poorest > 100_000
+
+    def test_identities_are_computed_not_guessed(self, engine):
+        r = engine.assess({"v012": 30, "v511": 18, "height_cm": 150,
+                           "weight_kg": 45, "v106": "higher", "v201": 3,
+                           "v024": "khulna", "b4": "female"},
+                          include_record=True)
+        rec = r["record_used"]
+        assert rec["bmi"] == 20.0                 # 45 / 1.5^2
+        assert rec["v013"] == "30-34"             # age band
+        assert rec["v512"] == 12                  # 30 - 18 years married
+        assert rec["v218"] == 3                   # living children <= ever born
+        assert rec["v149"] == "higher"            # attainment follows level
+        assert rec["v139"] == "khulna"            # de jure mirrors de facto
+        assert rec["p4"] == "female"              # child's sex across recodes
+        for f in ("bmi", "v013", "v512", "v218"):
+            assert f in r["inputs"]["fill_strategy"]["derived"]
+
+    def test_a_rule_never_overwrites_the_caller(self, engine):
+        r = engine.assess({"height_cm": 150, "weight_kg": 45, "bmi": 31.0},
+                          include_record=True)
+        assert r["record_used"]["bmi"] == 31.0
+        assert "bmi" in r["inputs"]["provided"]
+
+    def test_explicit_null_is_left_missing(self, engine):
+        """A blank in a modular survey is informative — b11 absent means a
+        first birth — so a null must not be imputed."""
+        r = engine.assess({"v012": 22, "b11": None}, include_record=True)
+        assert r["record_used"]["b11"] is None
+        assert "b11" not in r["inputs"]["defaulted"]
+
+    def test_csv_blanks_are_left_missing(self, engine):
+        """Column present in the upload => its blanks are the respondent's,
+        not something to fill."""
+        frame = pd.DataFrame([{"v012": 22, "b11": None},
+                              {"v012": 31, "b11": 24}])
+        prepared, report = engine.prepare(frame)
+        assert pd.isna(prepared["b11"].iloc[0])
+        assert prepared["b11"].iloc[1] == 24
+        assert "b11" not in report["defaulted"]
+
+    def test_fill_none_defaults_nothing(self, engine):
+        prepared, report = engine.prepare([{"v012": 22}], fill="none")
+        assert report["defaulted"] == []
+        assert pd.isna(prepared["v190"].iloc[0])
+
+    def test_strategy_partitions_the_features(self, engine):
+        r = engine.assess({"v012": 22, "v190": "richest"})
+        s = r["inputs"]["fill_strategy"]
+        buckets = set(s["derived"]) | set(s["from_wealth_residence_cell"]) | set(s["from_flat_template"])
+        assert set(r["inputs"]["provided"]).isdisjoint(
+            set(s["from_wealth_residence_cell"]) | set(s["from_flat_template"]))
+        assert buckets | set(r["inputs"]["provided"]) >= set(engine.features)
+
+
+# ===========================================================================
+# 3c. The assessment form covers every input the models take.
+# ===========================================================================
+@needs_bundles
+class TestFormCoverage:
+
+    def test_every_feature_is_asked_derived_or_optional(self, engine):
+        """No model input may be reachable only through a default.
+
+        A retrained bundle that introduces a feature would otherwise have it
+        silently filled from the template forever, with nothing in the UI to
+        set it.
+        """
+        from app.views.assess import CORE_FIELDS, ENGINE_DERIVED, optional_fields
+
+        core = {f["code"] for f in CORE_FIELDS}
+        optional = {f["code"] for f in optional_fields(engine.version)}
+        assert core | optional | ENGINE_DERIVED == set(engine.features)
+        assert not core & optional
+        assert not core & ENGINE_DERIVED
+        assert not optional & ENGINE_DERIVED
+
+    def test_every_engine_derived_field_has_a_rule(self, engine):
+        """A field withheld from the form because the engine computes it must
+        actually be computable, or it silently falls through to the template."""
+        from app.views.assess import ENGINE_DERIVED
+        from core.defaults import GROUP_FILL, RULES
+
+        covered = {target for target, _, _ in RULES} | GROUP_FILL
+        assert ENGINE_DERIVED <= covered
+
+    def test_optional_fields_carry_what_the_widgets_need(self, engine):
+        from app.views.assess import optional_fields
+
+        for f in optional_fields(engine.version):
+            assert f["widget"] in ("opt_select", "opt_number")
+            assert f["label"] and f["group"]
+            if f["widget"] == "opt_number":
+                assert f["typical"] is None or isinstance(f["typical"], (int, float))
+            else:
+                assert engine.schema[f["code"]]["allowed"]
 
 
 # ===========================================================================
