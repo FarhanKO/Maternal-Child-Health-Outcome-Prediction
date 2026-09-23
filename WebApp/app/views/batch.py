@@ -8,11 +8,11 @@ import streamlit as st
 from app import state
 from app.ui.theme import (BAND_COLOUR, INDIGO, MUTED, PLOTLY_CONFIG,
                           PLOTLY_LAYOUT, TEAL, footer, page_title, section)
-from app.views.assess import FIELDS
+from app.views.assess import CORE_FIELDS
 from core.engine import TARGET_LABEL
 from core.presets import BASE_TEMPLATE, PRESETS
 
-TEMPLATE_COLUMNS = [f["code"] for f in FIELDS]
+TEMPLATE_COLUMNS = [f["code"] for f in CORE_FIELDS]
 
 
 def _template_csv() -> bytes:
@@ -81,8 +81,9 @@ def render() -> None:
     if up is None:
         section("How blanks are treated")
         c1, c2, c3 = st.columns(3)
-        c1.markdown("**Column absent** → filled from the cohort-typical template, "
-                    "reported in the summary.")
+        c1.markdown("**Column absent** → resolved from the columns you did "
+                    "send: an identity where one exists, else the value typical "
+                    "of that row's wealth quintile and residence.")
         c2.markdown("**Cell empty** → left missing. The models were trained on a "
                     "modular survey and handle missingness natively.")
         c3.markdown("**Value not in vocabulary** → treated as missing and listed "
