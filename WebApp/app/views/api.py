@@ -239,9 +239,12 @@ def render() -> None:
              "<code>threshold</code> (cost-optimal, capacity-capped), "
              "<code>national_rate</code>, <code>flagged</code>, <code>lift</code>, "
              "<code>prediction_set</code> (conformal, 90% coverage) and "
-             "<code>committed</code>.<br><b>inputs</b> which fields were provided, "
-             "defaulted, ignored, and any vocabulary warnings.<br><b>meta</b> model "
-             "version and latency.", kicker="POST /v1/predict", body_is_html=True)
+             "<code>committed</code>.<br><b>inputs</b> which fields you provided, "
+             "which were ignored, any vocabulary warnings, and "
+             "<code>fill_strategy</code> — how every field you left out was "
+             "resolved (<code>derived</code> identity, your wealth cell, or the "
+             "flat template).<br><b>meta</b> model version and latency.",
+             kicker="POST /v1/predict", body_is_html=True)
         st.markdown("")
         card("Limits & fair use",
              "60 requests per minute per key · 500 records per batch call · "
