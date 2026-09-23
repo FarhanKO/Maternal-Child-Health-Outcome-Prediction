@@ -8,8 +8,11 @@ column is recovered. Nothing here imports train.py.
 
 Input semantics, shared by the dashboard, the batch scorer and the API:
 
-  * a field that is OMITTED is filled from the cohort-typical template, and
-    the response lists it under `inputs.defaulted`;
+  * a field that is OMITTED is filled in four steps — a functional rule
+    where one exists (BMI from height and weight), then the cohort-typical
+    value within the caller's own wealth-quintile x residence cell, then the
+    flat marginal template — and the response lists what happened to each
+    under `inputs.defaulted` and `inputs.fill_strategy` (see core/defaults.py);
   * a field sent as null/NaN is treated as genuinely unknown and left missing,
     which the preprocessors were trained to handle;
   * a categorical value outside the training vocabulary is treated as missing
@@ -32,6 +35,8 @@ import numpy as np
 import pandas as pd
 
 from core import paths  # noqa: F401  (Maternal_Health/ on sys.path for src.*)
+from core.defaults import (apply_group_defaults, apply_rules,
+                           apply_template)
 from core.labels import group as feature_group
 from core.labels import label as feature_label
 from core.model_store import (OPTIONAL_FILES, REQUIRED_BUNDLES, models_dir)
@@ -117,9 +122,6 @@ NUMERIC_HINTS = {
     "v238": dict(min=0, max=3, step=1),
 }
 
-AGE_BANDS = ["15-19", "20-24", "25-29", "30-34", "35-39", "40-44", "45-49"]
-
-
 def _register_pickle_aliases() -> None:
     """Bundles written from a notebook recorded the ensemble class under
     __main__; train.py's live in src.models. Both must resolve."""
@@ -138,16 +140,6 @@ def band_for(n_flagged: int) -> str:
     if n_flagged == 1:
         return "MONITOR"
     return "PRIORITY"
-
-
-def _age_band(age: float) -> str | None:
-    if age is None or (isinstance(age, float) and math.isnan(age)):
-        return None
-    for band in AGE_BANDS:
-        lo, hi = (int(x) for x in band.split("-"))
-        if lo <= age <= hi:
-            return band
-    return None
 
 
 def _iter_preps(bundle: dict) -> Iterable[Any]:
@@ -337,50 +329,57 @@ class CascadeEngine:
                         text = text.where(~unknown, None)
                 frame[col] = text.astype(object).where(text.notna(), np.nan)
 
-        # Derived fields, only where the inputs to derive them were given.
-        # A derived value beats the template default but never overrides a
-        # value the caller supplied.
-        def _derive(col: str, derived: pd.Series) -> None:
-            if col in frame.columns:
-                frame[col] = frame[col].where(frame[col].notna(), derived)
-            else:
-                frame[col] = derived
-                known.append(col)
-            if absent is not None:
-                absent[col] = (absent[col] if col in absent.columns
-                               else pd.Series(True, index=frame.index)) & derived.isna()
+        # What the caller actually supplied, before anything is filled in.
+        # A key omitted from a record and a key sent as null are different:
+        # only the first may be replaced by a default.
+        supplied = [c for c in known
+                    if absent is None or not bool(absent[c].all())]
+        report["provided"] = sorted(supplied)
+        if absent is not None and len(records) == 1:
+            report["provided"] = sorted(c for c in known if not absent[c].iloc[0])
 
-        if {"height_cm", "weight_kg"} <= set(frame.columns):
-            h = frame["height_cm"] / 100.0
-            _derive("bmi", (frame["weight_kg"] / (h * h)).round(2))
-        if "v012" in frame.columns:
-            _derive("v013", frame["v012"].map(_age_band).astype(object))
-
-        report["provided"] = sorted(known)
-        if absent is not None and fill == "template":
-            for col in absent.columns:
-                mask = absent[col].to_numpy(dtype=bool)
-                if mask.any() and col in BASE_TEMPLATE:
-                    frame.loc[mask, col] = BASE_TEMPLATE[col]
-            if len(records) == 1:
-                # The single-record report is exact; the batch one below
-                # lists only the columns no record supplied.
-                report["provided"] = sorted(
-                    c for c in known if not absent[c].iloc[0])
-                report["defaulted"] = sorted(
-                    c for c in known if absent[c].iloc[0] and c in BASE_TEMPLATE)
+        # Create the absent columns with the dtype their values will need.
+        # An all-NaN column is float64, and pandas 3 raises rather than
+        # silently upcasting when a categorical default is written into it.
         for feat in self.features:
             if feat not in frame.columns:
-                frame[feat] = (BASE_TEMPLATE.get(feat, np.nan)
-                               if fill == "template" else np.nan)
-                report["defaulted"].append(feat)
-        report["defaulted"] = sorted(set(report["defaulted"]))
+                frame[feat] = (np.nan if self.schema[feat]["type"] == "numeric"
+                               else pd.Series([None] * len(frame),
+                                              index=frame.index, dtype=object))
+        frame = frame[self.features].copy()
+
+        if fill == "template":
+            # `known` marks cells the caller filled, so a rule never
+            # overwrites a real value — including a deliberate null.
+            known_mask = pd.DataFrame(False, index=frame.index,
+                                      columns=self.features)
+            for col in known:
+                known_mask[col] = (~absent[col].to_numpy(dtype=bool)
+                                   if absent is not None else True)
+            derived = apply_rules(frame, known_mask)
+            grouped = apply_group_defaults(frame, self.features, known_mask)
+            templated = apply_template(frame, self.features, known_mask)
+            report["derived"] = sorted(set(derived))
+            report["defaulted"] = sorted(
+                (set(grouped) | set(templated) | set(derived))
+                - set(report["provided"]))
+            report["fill_strategy"] = {
+                "derived": sorted(set(derived)),
+                "from_wealth_residence_cell": sorted(
+                    set(grouped) - set(derived) - set(report["provided"])),
+                "from_flat_template": sorted(
+                    set(templated) - set(grouped) - set(derived)
+                    - set(report["provided"])),
+            }
+        else:
+            report["derived"] = []
+            report["defaulted"] = []
 
         # The pipelines were fitted on object-dtype categoricals holding
         # np.nan (see src.utils.denullify). pandas 3 infers its own `str`
         # dtype for a column built from a scalar, and the fitted encoders do
         # not treat the two identically, so the frame is normalised here.
-        frame = frame[self.features].copy()
+        frame = frame.copy()
         for feat in self.features:
             if self.schema[feat]["type"] == "numeric":
                 frame[feat] = pd.to_numeric(frame[feat], errors="coerce").astype("float64")
@@ -538,8 +537,12 @@ class CascadeEngine:
             fields.append(entry)
         return {"fields": fields, "n_fields": len(fields),
                 "semantics": {
-                    "omitted": "filled from the cohort-typical template and "
-                               "listed under inputs.defaulted",
+                    "omitted": "resolved in three steps and reported under "
+                               "inputs.fill_strategy: a functional identity "
+                               "where one exists (bmi from height_cm and "
+                               "weight_kg), then the value typical of the "
+                               "caller's wealth-quintile x residence cell, "
+                               "then the flat cohort template",
                     "null": "treated as genuinely unknown",
                     "unknown_category": "treated as missing and reported "
                                         "under inputs.warnings",
