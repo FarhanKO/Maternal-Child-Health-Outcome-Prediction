@@ -56,7 +56,7 @@ def render() -> None:
   the direction reverses.
 - **Decision curves.** Four targets beat treat-all and treat-none across useful
   ranges. Severe stunting has *negative* net benefit at its operating point.
-- **A pretrained transformer.** TabPFN-3 under the identical split reproduces the
+- **A pretrained transformer.** [TabPFN-3](https://doi.org/10.1038/s41586-024-08328-6) under the identical split reproduces the
   same envelope — the clearest evidence that the ceiling is informational.
 """)
 
@@ -107,18 +107,13 @@ respondent's row.
 **Paper:** IEEE conference format, 7 pages, in `Papers/`.
 """)
 
-    section("Authors & references")
-    st.markdown("""
+    section("Author")
+    st.markdown(f"""
 **MD Farhan** — Department of Computer Science and Engineering, BRAC University, Dhaka.
 
-1. Naznin, S., Uddin, M. J., & Kabir, A. (2025). Identifying determinants of under-5
-   mortality in Bangladesh: A machine learning approach with BDHS 2022 data.
-   *PLOS ONE, 20*(6), e0324825. https://doi.org/10.1371/journal.pone.0324825
-2. Rao, B. et al. (2025). Machine learning in predicting child malnutrition: A
-   meta-analysis of Demographic and Health Surveys data. *IJERPH, 22*(3), 449.
-   https://doi.org/10.3390/ijerph22030449
-3. Hollmann, N. et al. (2025). Accurate predictions on small data with a tabular
-   foundation model. *Nature, 637*, 319–326. https://doi.org/10.1038/s41586-024-08328-6
+The full reference list, the comparison against previously published DHS
+results and the complete methodology are in the paper
+([{REPO.replace('https://', '')}]({REPO})).
 
 Data courtesy of The DHS Program and the National Institute of Population Research
 and Training, Bangladesh.
